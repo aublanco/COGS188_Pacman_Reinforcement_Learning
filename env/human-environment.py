@@ -6,7 +6,7 @@ import ale_py
 def main():
     # Initialize the Gym environment with rgb_array rendering
     gym.register_envs(ale_py)
-    env = gym.make("MsPacmanDeterministic-v4", render_mode="rgb_array")
+    env = gym.make("MsPacman-v4", render_mode="rgb_array")
     env = env.unwrapped
     observation, info = env.reset()
 
