@@ -4,7 +4,6 @@ import matplotlib.pyplot as plt
 import gymnasium as gym
 import ale_py
 
-# Register Atari environments.
 gym.register_envs(ale_py)
 
 def crop_gameplay_area(state, bottom_crop=30):
@@ -15,13 +14,12 @@ def crop_gameplay_area(state, bottom_crop=30):
 
 def extract_pacman_coords(state):
     """
-    Robustly extracts Pacman's (x,y) coordinates from the game image,
+    extracts Pacman's (x,y) coordinates from the game image,
     after cropping out UI elements.
     """
     # Crop the image to remove UI (like lives and score) from the bottom.
     cropped_state = crop_gameplay_area(state, bottom_crop=30)
     
-    # Convert from RGB to BGR (OpenCV uses BGR) and then to HSV.
     state_bgr = cv2.cvtColor(cropped_state, cv2.COLOR_RGB2BGR)
     hsv = cv2.cvtColor(state_bgr, cv2.COLOR_BGR2HSV)
     
@@ -53,32 +51,21 @@ def extract_pellet_and_wall_masks(observation, pellet_area_threshold=50):
     """
     Extracts separate binary masks for pellets and walls from the observation.
     Walls and pellets are assumed to share the same RGB value.
-    
-    Args:
-        observation (np.ndarray): The game image in RGB.
-        pellet_area_threshold (int): Maximum contour area to be considered a pellet.
-        
-    Returns:
-        pellet_mask (np.ndarray): Binary mask for pellets.
-        wall_mask (np.ndarray): Binary mask for walls.
     """
-    # Convert the image from RGB to BGR, then to HSV.
     state_bgr = cv2.cvtColor(observation, cv2.COLOR_RGB2BGR)
     hsv = cv2.cvtColor(state_bgr, cv2.COLOR_BGR2HSV)
     
-    # Define the HSV range for walls and pellets (adjust as needed).
+    # Define the HSV range for walls and pellets.
     lower_bound = np.array([0, 120, 220])
     upper_bound = np.array([10, 255, 255])
     combined_mask = cv2.inRange(hsv, lower_bound, upper_bound)
     
-    # Clean up the mask with a morphological close.
     kernel = np.ones((3, 3), np.uint8)
     combined_mask = cv2.morphologyEx(combined_mask, cv2.MORPH_CLOSE, kernel)
     
     # Find contours in the combined mask.
     contours, _ = cv2.findContours(combined_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     
-    # Prepare empty masks for pellets and walls.
     pellet_mask = np.zeros_like(combined_mask)
     wall_mask = np.zeros_like(combined_mask)
     
@@ -92,13 +79,6 @@ def extract_pellet_and_wall_masks(observation, pellet_area_threshold=50):
             cv2.drawContours(wall_mask, [cnt], -1, 255, -1)
     
     return pellet_mask, wall_mask
-
-def count_pellets(pellet_mask):
-    """
-    Counts the number of pellet-like contours in the pellet mask.
-    """
-    contours, _ = cv2.findContours(pellet_mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
-    return len(contours)
 
 def closest_food_distance(observation, pacman_coords):
     pellet_mask, _ = extract_pellet_and_wall_masks(observation)
@@ -114,7 +94,6 @@ def closest_food_distance(observation, pacman_coords):
     return 1000, None
     
 if __name__ == "__main__":
-    # Create the MsPacman environment with an RGB observation.
     env = gym.make("MsPacman-v4", render_mode="rgb_array")
     state, _ = env.reset()
     
@@ -127,7 +106,6 @@ if __name__ == "__main__":
     closest_food, food_coord = closest_food_distance(state, pacman_coords)
     print("Closest food distance:", closest_food)
     print("Closest food coordinates:", food_coord)
-    # Visualize the original image with Pacman marked, and the pellet/wall masks.
     plt.figure(figsize=(12, 4))
     
     # Display original image with Pacman coordinate marked.
@@ -153,5 +131,6 @@ if __name__ == "__main__":
     plt.axis("off")
     
     plt.tight_layout()
-    plt.show()
     plt.savefig("featureExtractor.png")
+    plt.show()
+    
