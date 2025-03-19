@@ -17,10 +17,8 @@ gym.register_envs(ale_py)
 env = gym.make('MsPacman-v4', render_mode='rgb_array') #(210, 160, 3) 210x160 RGB image
 
 # add enviornment wrapper to resize the image to 84x84 and convert to grayscale
-env = AtariPreprocessing(env, frame_skip=1, screen_size=84, terminal_on_life_loss=True) 
-# (84, 84)
-env = FrameStackObservation(env, stack_size=4) 
-# (4, 84, 84) 4 frames stacked
+env = AtariPreprocessing(env, frame_skip=1, screen_size=84, terminal_on_life_loss=True) # (84, 84)
+env = FrameStackObservation(env, stack_size=4) # (4, 84, 84) 4 frames stacked
 env = TransformObservation(env, lambda obs: obs / 255.0, env.observation_space) 
 # normalize the image
 
@@ -164,7 +162,7 @@ class DQNAgent:
         # Q-networks
         self.qnetwork_local = QNetwork(action_size, seed).to(device)
         self.qnetwork_target = QNetwork(action_size, seed).to(device)
-        self.optimizer = optim.Adam(self.qnetwork_local.parameters())
+        self.optimizer = optim.Adam(self.qnetwork_local.parameters(), lr=1e-4, eps=0.01) # learning rate
         
         
         # Replay memory
@@ -234,6 +232,7 @@ class DQNAgent:
         self.optimizer.zero_grad()
         
         loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.qnetwork_local.parameters(), 1) # to prevent exploding gradients
         self.optimizer.step()
         self.soft_update(self.qnetwork_local, self.qnetwork_target, self.tau)
 
@@ -256,9 +255,9 @@ class DQNAgent:
     #     pass
 
 # Initialize the agent
-agent = DQNAgent(action_size=env.action_space.n, seed=0)
+agent = DQNAgent(action_size=5, seed=0)
 
-def dqn_scores(n_episodes=2000, max_t=1000, eps_start=1.0, eps_end=0.01, eps_decay=0.9995):
+def dqn_scores(n_episodes=2000, max_t=100000, eps_start=1.0, eps_end=0.1, eps_decay=0.99):
     """
     Deep Q-Learning.
 
@@ -287,19 +286,31 @@ def dqn_scores(n_episodes=2000, max_t=1000, eps_start=1.0, eps_end=0.01, eps_dec
             
             agent.step(state, action, reward, next_state, done)
             state = next_state
+            
+            # reward = np.clip(reward, -1, 1) # clip the reward to be between -1 and 1
+            if reward <= 0:
+                reward = -0.1
+            
             score += reward
     
             if done:
                 break
             
         eps = max(eps_end, eps_decay*eps) # decrease epsilon
+        eps = eps
+        
         scores.append(score)
         scores_window.append(score)
         
-        if i_episode % 50 == 0:
+        if i_episode % 10 == 0:
             print(f'\rEpisode {i_episode}\tAverage Score: {np.mean(scores_window):.2f}')
         
-        if np.mean(scores_window) >= 200.0:
+        if np.mean(scores_window) >= 300.0:
+            print(f'\nEnvironment solved in {i_episode} episodes!\tAverage Score: {np.mean(scores_window):.2f}')
+            torch.save(agent.qnetwork_local.state_dict(), 'checkpoint.pth')
+            break
+        
+        if np.max(scores) >= 1000:
             print(f'\nEnvironment solved in {i_episode} episodes!\tAverage Score: {np.mean(scores_window):.2f}')
             torch.save(agent.qnetwork_local.state_dict(), 'checkpoint.pth')
             break
